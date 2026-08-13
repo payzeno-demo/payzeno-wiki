@@ -1,5 +1,5 @@
 ---
-title: "Ledger settlement alarms — the coverage map and the known blind spot"
+title: "The ledger settlement alarm architecture"
 space: OPS
 space_name: "Operations & On-call"
 author: Avi Pager
@@ -12,18 +12,18 @@ source: confluence-export
 page_version: 13
 ---
 
-# Ledger settlement alarms — the coverage map and the known blind spot
+# The ledger settlement alarm architecture
 
 > **Operations & On-call** · wiki export · written by Avi Pager · last edited 2026-07-26
 
-This page is the standing coverage map for the settlement-integrity alarm set:
-what each alarm catches, why each threshold is the number it is, and the one gap
-in the coverage. The alarms are defined in
+The settlement-integrity alarm architecture is four metric alarms plus one
+composite, defined in
 `payzeno-infrastructure/envs/production/alarms_ledger.tf` (PAY-2055 — written at
-03:40 on the postmortem day, as the file's own header admits). Every alarm maps to
-a way PAY-2041 hid. Four alarms, one composite, one known blind spot. Owner: Avi.
+03:40 on the postmortem day, as the file's own header admits). Each alarm exists
+because PAY-2041 evaded its predecessor; the set carries one known coverage gap.
+Owner: Avi.
 
-## The map
+## The alarm set
 
 | Alarm | Catches | The 2041 connection |
 |---|---|---|
@@ -32,7 +32,7 @@ a way PAY-2041 hid. Four alarms, one composite, one known blind spot. Owner: Avi
 | `reconciliation-lag` | oldest retryable item over 2h (`threshold           = 7200`) | the precondition: a big backlog is what makes sweep and drain overlap at all |
 | `retry-drain-depth` | retryable backlog over 500 (`threshold           = 500`) | it went from single digits to 4,113 in eleven minutes and nothing anywhere reported it |
 
-## Why the thresholds are what they are
+## Threshold semantics — each number is a decision
 
 - **ABSENT, not zero.** `DuplicateSettlementDetected` does not exist when nothing
   is wrong, hence treat_missing_data is notBreaching — `missing` would park the
@@ -46,16 +46,16 @@ a way PAY-2041 hid. Four alarms, one composite, one known blind spot. Owner: Avi
 - **The composite** `ledger_settlement_integrity` is what #incidents subscribes to,
   so a cascade is one incident, not four pages three minutes apart.
 
-## The known blind spot
+## The known coverage gap
 
 The duplicate alarm is gated on `FLAG_DUPLICATE_SETTLEMENT_ALARM` in the ledger's
-config. When that flag is off, this alarm goes quiet rather than going green — the
+config. With that flag off, this alarm goes quiet rather than going green — the
 metric stops being emitted and notBreaching reads the silence as health. Nothing
 on the infra side can tell the difference. The honest fix is a meta-alarm on the
-flag's state or a heartbeat metric; until one is scheduled, any change to that
-flag is a paging-system change and goes through Avi.
+flag's state or a heartbeat metric; until one exists, any change to that flag is
+a paging-system change and goes through Avi.
 
-## Why the file looks the way it does
+## Why the file is shaped the way it is
 
 These are raw `aws_cloudwatch_metric_alarm` resources, against the repo's own
 module convention. Partly metric math (the module cannot express the overposted
